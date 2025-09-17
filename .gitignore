@@ -1,0 +1,36 @@
+/target
+
+# Rust-analyzer and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Nix build results
+/result
+/result-*
+
+# direnv cache (if using direnv with nix-shell/flakes)
+.direnv/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
