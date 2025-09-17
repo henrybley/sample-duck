@@ -327,7 +327,7 @@ impl AudioPlayer {
                     .chan(0)
                     .iter()
                     .map(|&s| {
-                        let i32_val = s.into_i32();
+                        let i32_val = s.inner();
                         // Proper S24 normalization: signed 24-bit has range [-2^23, 2^23-1]
                         if i32_val >= 0 {
                             i32_val as f32 / 8_388_607.0 // 2^23 - 1
@@ -340,7 +340,7 @@ impl AudioPlayer {
                     buf.chan(1)
                         .iter()
                         .map(|&s| {
-                            let i32_val = s.into_i32();
+                            let i32_val = s.inner();
                             if i32_val >= 0 {
                                 i32_val as f32 / 8_388_607.0
                             } else {
