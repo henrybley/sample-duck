@@ -2,7 +2,9 @@ use std::error::Error;
 use std::fmt;
 use std::fs::File;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use symphonia::core::audio::{AudioBufferRef, Signal, SignalSpec};
@@ -80,7 +82,9 @@ pub enum PlaybackState {
 
 pub struct AudioPlayer {
     samples: Arc<Mutex<Vec<f32>>>,
-    play_pos: Arc<Mutex<usize>>,
+    pub samples_count: usize,
+    pub peak_samples: Vec<(f32, f32)>,
+    play_pos: Arc<AtomicUsize>,
     state: Arc<Mutex<PlaybackState>>,
     _stream: cpal::Stream,
     out_channels: usize,
@@ -100,7 +104,7 @@ impl AudioPlayer {
         let sample_rate = config.sample_rate.0;
 
         let samples = Arc::new(Mutex::new(Vec::new()));
-        let play_pos = Arc::new(Mutex::new(0usize));
+        let play_pos = Arc::new(AtomicUsize::new(0));
         let state = Arc::new(Mutex::new(PlaybackState::Stopped));
         let loop_enabled = Arc::new(Mutex::new(false));
 
@@ -128,8 +132,12 @@ impl AudioPlayer {
 
         stream.play()?;
 
+        let peak_samples: Vec<(f32, f32)> = vec![];
+
         Ok(Self {
             samples,
+            samples_count: 0,
+            peak_samples,
             play_pos,
             state,
             _stream: stream,
@@ -142,13 +150,12 @@ impl AudioPlayer {
     fn audio_callback(
         data: &mut [f32],
         samples: &Arc<Mutex<Vec<f32>>>,
-        play_pos: &Arc<Mutex<usize>>,
+        play_pos: &Arc<AtomicUsize>,
         state: &Arc<Mutex<PlaybackState>>,
         loop_enabled: &Arc<Mutex<bool>>,
         out_channels: usize,
     ) {
         let samples_guard = samples.lock().unwrap();
-        let mut pos = play_pos.lock().unwrap();
         let current_state = *state.lock().unwrap();
         let is_looping = *loop_enabled.lock().unwrap();
 
@@ -159,16 +166,18 @@ impl AudioPlayer {
             return;
         }
 
+        let mut pos = play_pos.load(Ordering::Relaxed);
+
         for frame in data.chunks_mut(out_channels) {
-            if *pos + out_channels <= samples_guard.len() {
-                frame.copy_from_slice(&samples_guard[*pos..*pos + out_channels]);
-                *pos += out_channels;
+            if pos + out_channels <= samples_guard.len() {
+                frame.copy_from_slice(&samples_guard[pos..pos + out_channels]);
+                pos += out_channels;
             } else if is_looping {
                 // Loop back to beginning
-                *pos = 0;
+                pos = 0;
                 if out_channels <= samples_guard.len() {
                     frame.copy_from_slice(&samples_guard[0..out_channels]);
-                    *pos += out_channels;
+                    pos += out_channels;
                 }
             } else {
                 // End of playback
@@ -176,12 +185,16 @@ impl AudioPlayer {
                 break;
             }
         }
+
+        // Write back updated position
+        play_pos.store(pos, Ordering::Relaxed);
     }
 
-    pub fn load(&self, path: &str) -> Result<(), AudioPlayerError> {
+    pub fn load(&mut self, path: &str) -> Result<(), AudioPlayerError> {
         println!("Loading audio file: {}", path);
 
         let file = File::open(Path::new(path))?;
+
         let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
         // Probe the file format
@@ -259,9 +272,12 @@ impl AudioPlayer {
         );
 
         // Update player state
+        self.samples_count = new_samples.len();
         *self.samples.lock().unwrap() = new_samples;
-        *self.play_pos.lock().unwrap() = 0;
+        self.play_pos.store(0, Ordering::Relaxed);
         *self.state.lock().unwrap() = PlaybackState::Stopped;
+
+        self.peak_samples = Self::compute_peaks(&*self.samples.lock().unwrap());
 
         Ok(())
     }
@@ -378,6 +394,30 @@ impl AudioPlayer {
         Ok(())
     }
 
+    fn compute_peaks(samples: &[f32]) -> Vec<(f32, f32)> {
+        // Create peak samples for efficient visualization
+        // We'll downsample to have ~2000 points for display
+        let target_points = 2000;
+        let samples_per_point = samples.len().max(target_points) / target_points;
+        let mut peak_samples = Vec::with_capacity(target_points);
+
+        for chunk in samples.chunks(samples_per_point) {
+            if !chunk.is_empty() {
+                let min = *chunk
+                    .iter()
+                    .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .unwrap_or(&0.0);
+                let max = *chunk
+                    .iter()
+                    .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .unwrap_or(&0.0);
+                peak_samples.push((min, max));
+            }
+        }
+
+        peak_samples
+    }
+
     fn convert_buffer(&self, ch0: &[f32], ch1: &[f32], spec: SignalSpec, output: &mut Vec<f32>) {
         let in_channels = spec.channels.count();
         let out_channels = self.out_channels;
@@ -436,7 +476,7 @@ impl AudioPlayer {
 
     pub fn stop(&self) {
         *self.state.lock().unwrap() = PlaybackState::Stopped;
-        *self.play_pos.lock().unwrap() = 0;
+        self.play_pos.store(0, Ordering::Relaxed);
         println!("Playback stopped");
     }
 
@@ -463,16 +503,22 @@ impl AudioPlayer {
         *self.state.lock().unwrap()
     }
 
-    pub fn get_position(&self) -> (usize, usize) {
-        let pos = *self.play_pos.lock().unwrap();
-        let total = self.samples.lock().unwrap().len();
-        (pos, total)
+    pub fn get_position_index(&self) -> usize {
+        self.play_pos.load(Ordering::Relaxed)
     }
 
-    pub fn set_position(&self, sample_pos: usize) {
+    pub fn get_position_percentage(&self) -> f32 {
+        self.get_position_index() as f32 / self.samples_count as f32
+    }
+
+    pub fn seek_to_position_percentage(&self, sample_pos_percent: f32) {
+        self.seek_to_position((self.samples_count as f32 * sample_pos_percent) as usize);
+    }
+
+    pub fn seek_to_position(&self, sample_pos: usize) {
         let total_samples = self.samples.lock().unwrap().len();
         let clamped_pos = sample_pos.min(total_samples);
-        *self.play_pos.lock().unwrap() = clamped_pos;
+        self.play_pos.store(clamped_pos, Ordering::Relaxed);
         println!("Position set to sample {}/{}", clamped_pos, total_samples);
     }
 

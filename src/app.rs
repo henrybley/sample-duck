@@ -18,11 +18,13 @@ impl SampleDuckApp {
         // For now, scan a hardcoded folder
         import_samples_from_dir(&conn, "./demo/samples").unwrap();
 
-        let audio_player = AudioPlayer::new().unwrap();
+        let mut audio_player = AudioPlayer::new().unwrap();
         let samples = load_samples(&conn).unwrap();
 
         let selected_sample_idx = 0;
         let selected_sample = samples[selected_sample_idx].clone();
+
+        audio_player.load(&selected_sample.path);
 
         Self {
             conn,
