@@ -1,37 +1,54 @@
-use rusqlite::Connection;
-
-use crate::{audio_player::AudioPlayer, db::{init_db, load_samples}, import_samples_from_dir, sample::Sample};
+use crate::{audio_player::AudioPlayer, db::DB, sample::Sample};
+use std::{fs, path::Path};
 
 pub struct SampleDuckApp {
-    pub conn: Connection,
+    pub db: DB,
     pub audio_player: AudioPlayer,
     pub samples: Vec<Sample>,
-    pub selected_sample: Sample,
-    pub selected_sample_idx: usize,
+    pub selected_sample: Option<Sample>,
+    pub selected_sample_idx: Option<usize>,
+    pub sample_notes_modal_open: bool,
 }
 
 impl SampleDuckApp {
     pub fn new() -> Self {
-        let conn = Connection::open("samples.db").expect("failed to open db");
-        init_db(&conn).expect("failed to init db");
+        let db = DB::new();
 
-        // For now, scan a hardcoded folder
-        import_samples_from_dir(&conn, "./demo/samples").unwrap();
+        let audio_player = AudioPlayer::new().unwrap();
 
-        let mut audio_player = AudioPlayer::new().unwrap();
-        let samples = load_samples(&conn).unwrap();
-
-        let selected_sample_idx = 0;
-        let selected_sample = samples[selected_sample_idx].clone();
-
-        audio_player.load(&selected_sample.path);
+        let samples = db.get_samples().unwrap();
 
         Self {
-            conn,
+            db,
             audio_player,
             samples,
-            selected_sample,
-            selected_sample_idx,
+            selected_sample: None,
+            selected_sample_idx: None,
+            sample_notes_modal_open: false,
         }
+    }
+
+    pub(crate) fn import_samples_from_dir(&self, dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+
+            if let Some(ext) = path.extension().and_then(|e| e.to_str())
+                && ["wav", "flac", "mp3", "ogg"].contains(&ext.to_lowercase().as_str())
+            {
+                let file_meta = Sample::process_file(&path)?;
+                self.db.insert_sample(&file_meta)?;
+                println!("Added: {:?}", file_meta.name);
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn query_samples(&mut self) {
+        self.samples = self.db.get_samples().unwrap();
     }
 }

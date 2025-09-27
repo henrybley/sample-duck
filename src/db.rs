@@ -1,54 +1,115 @@
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 
 use crate::sample::Sample;
 
-pub fn init_db(conn: &Connection) -> rusqlite::Result<()> {
-    conn.execute_batch(
-        "
-        CREATE TABLE IF NOT EXISTS samples (
-            id INTEGER PRIMARY KEY,
-            path TEXT UNIQUE NOT NULL,
-            name TEXT NOT NULL,
-            format TEXT,
-            sample_rate INTEGER,
-            size INTEGER
-        );
-        ",
-    )?;
-    Ok(())
+pub struct DB {
+    pub conn: Connection,
 }
+impl DB {
+    pub fn new() -> Self {
+        let conn = Connection::open("samples.db").expect("failed to open db");
 
-pub fn insert_sample(conn: &Connection, meta: &Sample) -> rusqlite::Result<()> {
-    conn.execute(
-        "INSERT OR IGNORE INTO samples (path, name, format, sample_rate, size)
-         VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![
-            meta.path,
-            meta.name,
-            meta.format,
-            meta.sample_rate,
-            meta.size as i64,
-        ],
-    )?;
-    Ok(())
-}
+        Self::init_db(&conn).expect("failed to initialize db");
 
-pub fn load_samples(conn: &Connection) -> rusqlite::Result<Vec<Sample>> {
-    let mut stmt = conn.prepare("SELECT id, path, name, format, sample_rate, size FROM samples")?;
-    let rows = stmt.query_map([], |row| {
-        Ok(Sample {
-            id: row.get(0)?,
-            path: row.get(1)?,
-            name: row.get(2)?,
-            format: row.get(3)?,
-            sample_rate: row.get(4)?,
-            size: row.get(5)?,
-        })
-    })?;
-
-    let mut samples = Vec::new();
-    for row in rows {
-        samples.push(row?);
+        Self { conn }
     }
-    Ok(samples)
+
+    fn init_db(conn: &Connection) -> rusqlite::Result<()> {
+        conn.execute_batch(
+            "
+            CREATE TABLE IF NOT EXISTS samples (
+                id INTEGER PRIMARY KEY,
+                path TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                format TEXT,
+                sample_rate INTEGER,
+                duration INTEGER,
+                key TEXT,
+                size INTEGER,
+                rating INTEGER,
+                notes TEXT
+            );
+        ",
+        )?;
+        Ok(())
+    }
+
+    pub fn insert_sample(&self, meta: &Sample) -> rusqlite::Result<()> {
+        self.conn.execute(
+            "
+            INSERT OR IGNORE INTO 
+                samples (
+                    path,
+                    name,
+                    format,
+                    sample_rate,
+                    duration,
+                    key, 
+                    size,
+                    rating,
+                    notes
+                )
+            VALUES 
+                (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                meta.path,
+                meta.name,
+                meta.format,
+                meta.sample_rate,
+                meta.duration,
+                meta.key,
+                meta.size as i64,
+                meta.rating,
+                meta.notes,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_rating(&self, sample_id: isize, rating: u8) -> rusqlite::Result<()> {
+        self.conn.execute(
+            "UPDATE samples SET rating = ?1 WHERE id = ?2",
+            params![rating, sample_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_samples(&self) -> rusqlite::Result<Vec<Sample>> {
+        let mut stmt = self.conn.prepare(
+            "
+            SELECT 
+                id, 
+                path, 
+                name,
+                format,
+                sample_rate,
+                duration,
+                key,
+                size,
+                rating,
+                notes 
+            FROM 
+                samples",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(Sample {
+                id: row.get(0)?,
+                path: row.get(1)?,
+                name: row.get(2)?,
+                format: row.get(3)?,
+                sample_rate: row.get(4)?,
+                duration: row.get(5)?,
+                key: row.get(6)?,
+                size: row.get(7)?,
+                rating: row.get(8)?,
+                notes: row.get(9)?,
+            })
+        })?;
+
+        let mut samples = Vec::new();
+        for row in rows {
+            samples.push(row?);
+        }
+        Ok(samples)
+    }
 }
