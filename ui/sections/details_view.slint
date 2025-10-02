@@ -1,0 +1,189 @@
+import { IconButton } from "../components/icon_button.slint";
+import { SampleItem } from "../structs/sample_item.slint";
+import { WaveformPoint } from "../structs/waveform_point.slint";
+import { VerticalBox, HorizontalBox } from "std-widgets.slint";
+import { Icons } from "../icons.slint";
+import { Palette } from "../palette.slint";
+
+component WaveFormDisplay inherits VerticalLayout {
+    in property <[WaveformPoint]> waveform_data;
+    in property <float> playhead_position;
+    in property <int> ticks_count: 20;
+    in property <float> sample_duration;
+    in property <float> time_per_tick: sample_duration / ticks_count;
+
+    callback waveform_clicked(float);
+
+    Rectangle {
+        TouchArea {
+            clicked => {
+                root.waveform_clicked(self.mouse-x / self.width);
+            }
+        }
+
+        height: 10px;
+        background: Palette.background.brighter(0.2);
+        for tick in ticks_count: Rectangle {
+            if Math.mod(tick, 2) == 0: Text {
+                x: tick * parent.width / ticks_count + 2px;
+                y: 0px;
+                text: tick * time_per_tick;
+                color: Palette.foreground;
+                font-size: 10px;
+            }
+        }
+    }
+
+    Rectangle {
+        TouchArea {
+            clicked => {
+                root.waveform_clicked(self.mouse-x / self.width);
+            }
+        }
+
+        height: 8px;
+        background: Palette.background.brighter(0.2);
+        for tick in ticks_count: Rectangle {
+            if Math.mod(tick, 2) == 0: Rectangle {
+                x: tick * parent.width / ticks_count;
+                y: 0px;
+                width: 1px;
+                height: parent.height;
+                background: Palette.background.darker(0.2);
+            }
+        }
+    }
+
+    Rectangle {
+        TouchArea {
+            clicked => {
+                root.waveform_clicked(self.mouse-x / self.width);
+            }
+        }
+
+        height: 8px;
+        background: Palette.background.brighter(0.2);
+        for tick in ticks_count: Rectangle {
+            x: tick * parent.width / ticks_count;
+            y: 0px;
+            width: 1px;
+            height: parent.height;
+            background: Palette.background.darker(0.2);
+        }
+    }
+
+    Rectangle {
+        background: Palette.background.brighter(0.2);
+        TouchArea {
+            clicked => {
+                root.waveform_clicked(self.mouse-x / self.width);
+            }
+        }
+    
+        // Draw waveform lines
+        for point in waveform_data: Rectangle {
+            x: point.x * parent.width;
+            y: parent.height * 0.5 + point.min * parent.height * 0.5;
+            width: 1px;
+            height: (point.max - point.min) * parent.height * 0.5;
+            background: point.is_played ? Palette.accent : white;
+        }
+    
+        // Playhead
+        Rectangle {
+            x: playhead_position * parent.width;
+            y: 0;
+            width: 2px;
+            height: parent.height;
+            background: Palette.primary;
+        }
+    }
+}
+
+component AudioDisplay inherits Rectangle {
+    in property <SampleItem> selected_sample;
+    in property <[WaveformPoint]> waveform_data;
+    in property <float> playhead_position;
+
+    callback waveform_clicked(float);
+    callback toggle_play();
+
+    VerticalLayout {
+        WaveFormDisplay {
+            width: 65%;
+            waveform_data: waveform_data;
+            playhead_position: playhead_position;
+            sample_duration: selected_sample.sample_count / selected_sample.sample_rate;
+            waveform_clicked(pos) => {
+                waveform_clicked(pos)
+            }
+        }
+
+        HorizontalLayout {
+            IconButton {
+                width: 28px;
+                height: 28px;
+                icon: Icons.play;
+                icon_color: Palette.primary;
+                background: Palette.surface;
+                clicked() => {
+                    toggle_play();
+                }
+            }
+
+            IconButton {
+                width: 28px;
+                height: 28px;
+                icon: Icons.stop;
+                icon_color: Palette.primary;
+                background: Palette.surface;
+                clicked() => {
+                    toggle_play();
+                }
+            }
+
+            Text {
+                text: selected_sample.sample_count / selected_sample.sample_rate;
+            }
+        }
+    }
+}
+
+export component DetailsView inherits VerticalBox {
+    in property <SampleItem> selected_sample;
+    in property <float> playhead_position;
+
+    in property <[WaveformPoint]> waveform_data;
+    callback waveform_clicked(float);
+    callback toggle_play();
+
+    HorizontalBox {
+        VerticalBox {
+            width: 20%;
+            Text {
+                text: selected_sample.name;
+                font-size: 18px;
+                font-weight: 600;
+            }
+
+            Text {
+                text: selected_sample.notes;
+                wrap: word-wrap;
+            }
+        }
+
+        AudioDisplay {
+            width: 78%;
+            selected_sample: selected_sample;
+            waveform_data: waveform_data;
+            playhead_position: playhead_position;
+            height: 150px;
+            waveform_clicked(pos) => {
+                waveform_clicked(pos);
+            }
+            toggle_play() => {
+                toggle_play()
+            }
+        }
+    }
+}

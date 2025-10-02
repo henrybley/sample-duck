@@ -1,0 +1,175 @@
+import { SampleItem } from "../structs/sample_item.slint";
+import { Palette } from "../palette.slint";
+import { HorizontalBox, Button, ScrollView, VerticalBox } from "std-widgets.slint";
+import { Icons } from "../icons.slint";
+import { IconButton } from "../components/icon_button.slint";
+
+component StarRating inherits HorizontalLayout {
+    in property <int> rating;
+    in property <int> sample_id;
+    callback star_clicked(int, int);
+    callback clear_rating(int);
+    for i in 5: TouchArea {
+        width: parent.height + 2px;
+        height: parent.height;
+        Rectangle {
+            Image {
+                source: Icons.star;
+                colorize: i <= rating ? Palette.primary : Palette.foreground;
+                x: 2px;
+                y: 2px;
+                width: parent.width - self.x * 2;
+                height: parent.width - self.y * 2;
+                visible: true;
+            }
+        }
+
+        clicked => {
+            star_clicked(sample_id, i);
+        }
+    }
+    IconButton {
+        text: "";
+        icon: Icons.clear;
+        icon_color: Palette.error;
+        width: 18px;
+        height: 18px;
+        clicked => {
+            clear_rating(sample_id);
+        }
+    }
+}
+
+export component SampleList inherits Rectangle {
+    in property <[SampleItem]> samples;
+    in property <int> selected_index;
+
+    callback select_sample(int);
+    callback update_rating(int, int);
+    property <length> name_width: 180px;
+    property <length> path_width: 220px;
+    property <length> rating_width: 100px;
+    property <length> format_width: 50px;
+    property <length> sample_rate_width: 50px;
+    property <length> duration_width: 70px;
+    property <length> size_width: 70px;
+
+    background: Palette.background;
+
+    ScrollView {
+        VerticalBox {
+            // Header
+            HorizontalBox {
+                padding: 5px;
+                spacing: 10px;
+                Text {
+                    text: "Name";
+                    width: root.name_width;
+                    font-weight: 600;
+                    vertical-alignment: TextVerticalAlignment.bottom;
+                }
+
+                Text {
+                    text: "Path";
+                    width: root.path_width;
+                    font-weight: 600;
+                    vertical-alignment: TextVerticalAlignment.bottom;
+                }
+
+                Text {
+                    text: "Rating";
+                    width: root.rating_width;
+                    font-weight: 600;
+                    vertical-alignment: TextVerticalAlignment.bottom;
+                }
+
+                Text {
+                    text: "Format";
+                    width: root.format_width;
+                    font-weight: 600;
+                    vertical-alignment: TextVerticalAlignment.bottom;
+                }
+
+                Text {
+                    text: "Sample Rate";
+                    width: root.sample_rate_width;
+                    font-weight: 600;
+                    vertical-alignment: TextVerticalAlignment.bottom;
+                    wrap: TextWrap.word-wrap;
+                }
+
+                Text {
+                    text: "Duration";
+                    width: root.duration_width;
+                    font-weight: 600;
+                    vertical-alignment: TextVerticalAlignment.bottom;
+                }
+
+                Text {
+                    text: "Size";
+                    width: root.size_width;
+                    font-weight: 600;
+                    vertical-alignment: TextVerticalAlignment.bottom;
+                }
+            }
+
+            for sample[index] in samples: Rectangle {
+                height: 25px;
+                background: index == selected_index ? Palette.selected : (Math.mod(index, 2) == 0 ? Palette.background : Palette.background);
+                TouchArea {
+                    clicked => {
+                        root.select_sample(index);
+                    }
+                }
+
+                HorizontalBox {
+                    padding: 5px;
+                    spacing: 10px;
+                    Text {
+                        text: sample.name;
+                        width: root.name_width;
+                        overflow: elide;
+                    }
+
+                    Text {
+                        text: sample.path;
+                        width: root.path_width;
+                        overflow: elide;
+                    }
+
+                    StarRating {
+                        width: root.rating_width;
+                        rating: sample.rating;
+                        sample_id: sample.id;
+                        star_clicked(id, rating) => {
+                            update_rating(id, rating);
+                        }
+                        clear_rating(id) => {
+                            update_rating(id, 0);
+                        }
+                    }
+
+                    Text {
+                        text: sample.format;
+                        width: root.format_width;
+                    }
+
+                    Text {
+                        text: sample.sample_rate;
+                        width: root.sample_rate_width;
+                    }
+
+                    Text {
+                        text: Math.round(sample.sample_count / sample.sample_rate * 100) / 100 + "s";
+                        width: root.duration_width;
+                    }
+
+                    Text {
+                        text: sample.size;
+                        width: root.size_width;
+                    }
+                }
+            }
+        }
+    }
+}

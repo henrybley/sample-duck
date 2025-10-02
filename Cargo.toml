@@ -10,5 +10,9 @@ egui = "0.32.3"
 egui_extras = "0.32.3"
 rfd = "0.15.4"
 rusqlite = { version = "0.37", features = ["bundled"] }
-symphonia = "0.5.4"
+slint = "1.13.1"
+symphonia = { version = "0.5.4", features = ["all-codecs"] }
 walkdir = "2.5.0"
+
+[build-dependencies]
+slint-build = "1.13"
