@@ -1,0 +1,98 @@
+import { Button, ListView, HorizontalBox, VerticalBox, GridBox, ScrollView } from "std-widgets.slint";
+import { IconButton } from "components/icon_button.slint";
+import { DetailsView } from "sections/details_view.slint";
+import { SampleList } from "sections/sample_list.slint";
+import { SampleItem } from "structs/sample_item.slint";
+import { WaveformPoint } from "structs/waveform_point.slint";
+import { Palette } from "palette.slint";
+
+
+
+
+
+export component AppWindow inherits Window {
+    title: "Sample Duck";
+    width: 1000px;
+    height: 700px;
+    in property <[SampleItem]> samples;
+    in property <SampleItem> selected_sample;
+    in property <bool> has_selected_sample;
+    in property <int> selected_index;
+    in property <float> playhead_position;
+    in property <[WaveformPoint]> waveform_data;
+    callback import_dir();
+    callback select_sample(int);
+    callback update_rating(int, int);
+    callback toggle_play();
+    callback waveform_clicked(float);
+    callback next_sample();
+    callback prev_sample();
+
+    background: Palette.background;
+
+    // Handle key events
+    my-key-handler := FocusScope {
+        key-pressed(event) => {
+            if (event.text == Key.DownArrow || event.text == "j") {
+                next_sample();
+                accept
+            } else if (event.text == Key.UpArrow || event.text == "k") {
+                prev_sample();
+                accept
+            } else if (event.text == Key.Space) {
+                toggle_play();
+                accept
+            } else {
+                reject
+            }
+        }
+    }
+
+    Rectangle {
+        background: Palette.background;
+
+        VerticalLayout {
+            HorizontalBox {
+                Text {
+                    color: Palette.primary;
+                    text: "Sample Duck";
+                    font-size: 24px;
+                    font-weight: 800;
+                }
+            }
+
+            if has_selected_sample: DetailsView {
+                selected_sample: selected_sample;
+                playhead_position: playhead_position;
+                waveform_data: waveform_data;
+                waveform_clicked(pos) => {
+                    waveform_clicked(pos);
+                }
+                toggle_play() => {
+                    toggle_play();
+                };
+            }
+
+            SampleList {
+                samples: samples;
+                selected_index: selected_index;
+                select_sample(idx) => {
+                    select_sample(idx);
+                }
+                update_rating(idx, new_rating) => {
+                    update_rating(idx, new_rating);
+                }
+            }
+
+            HorizontalBox {
+                width: 150px;
+                Button {
+                    text: "Import Dir";
+                    clicked => {
+                        import_dir();
+                    }
+                }
+            }
+        }
+    }
+}
