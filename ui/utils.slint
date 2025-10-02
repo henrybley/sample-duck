@@ -1,0 +1,6 @@
+export global Utils {
+    pure public function round_to(number: float, decimals: int) -> float {
+        let factor = Math.pow(10, decimals);
+        return Math.round(number * factor) / factor;
+    }
+}

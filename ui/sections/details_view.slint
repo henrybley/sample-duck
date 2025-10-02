@@ -4,6 +4,7 @@ import { WaveformPoint } from "../structs/waveform_point.slint";
 import { VerticalBox, HorizontalBox } from "std-widgets.slint";
 import { Icons } from "../icons.slint";
 import { Palette } from "../palette.slint";
+import { Utils } from "../utils.slint";
 
 component WaveFormDisplay inherits VerticalLayout {
     in property <[WaveformPoint]> waveform_data;
@@ -27,7 +28,7 @@ component WaveFormDisplay inherits VerticalLayout {
             if Math.mod(tick, 2) == 0: Text {
                 x: tick * parent.width / ticks_count + 2px;
                 y: 0px;
-                text: tick * time_per_tick;
+                text: Utils.round_to(tick * time_per_tick, 2);
                 color: Palette.foreground;
                 font-size: 10px;
             }
@@ -104,9 +105,11 @@ component AudioDisplay inherits Rectangle {
     in property <SampleItem> selected_sample;
     in property <[WaveformPoint]> waveform_data;
     in property <float> playhead_position;
+    property <bool> currently_playing: true;
 
     callback waveform_clicked(float);
     callback toggle_play();
+    callback stop_play();
 
     VerticalLayout {
         WaveFormDisplay {
@@ -120,13 +123,25 @@ component AudioDisplay inherits Rectangle {
         }
 
         HorizontalLayout {
-            IconButton {
+            if (currently_playing): IconButton {
+                width: 28px;
+                height: 28px;
+                icon: Icons.pause;
+                icon_color: Palette.primary;
+                background: Palette.surface;
+                clicked() => {
+                    currently_playing = false;
+                    toggle_play();
+                }
+            }
+            if (!currently_playing): IconButton {
                 width: 28px;
                 height: 28px;
                 icon: Icons.play;
                 icon_color: Palette.primary;
                 background: Palette.surface;
                 clicked() => {
+                    currently_playing = true;
                     toggle_play();
                 }
             }
@@ -138,12 +153,19 @@ component AudioDisplay inherits Rectangle {
                 icon_color: Palette.primary;
                 background: Palette.surface;
                 clicked() => {
-                    toggle_play();
+                    currently_playing = false;
+                    stop_play();
                 }
             }
 
-            Text {
-                text: selected_sample.sample_count / selected_sample.sample_rate;
+            Rectangle {
+                width: 80px;
+                Text {
+                    text: Utils.round_to(selected_sample.sample_count / selected_sample.sample_rate, 2) + "s";
+                    color: Palette.foreground;
+                    font-size: 18px;
+                    font-weight: 800;
+                }
             }
         }
     }
@@ -156,6 +178,7 @@ export component DetailsView inherits VerticalBox {
     in property <[WaveformPoint]> waveform_data;
     callback waveform_clicked(float);
     callback toggle_play();
+    callback stop_play();
 
     HorizontalBox {
         VerticalBox {
@@ -183,6 +206,9 @@ export component DetailsView inherits VerticalBox {
             }
             toggle_play() => {
                 toggle_play()
+            }
+            stop_play() => {
+                stop_play();
             }
         }
     }

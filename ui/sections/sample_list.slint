@@ -3,6 +3,7 @@ import { Palette } from "../palette.slint";
 import { HorizontalBox, Button, ScrollView, VerticalBox } from "std-widgets.slint";
 import { Icons } from "../icons.slint";
 import { IconButton } from "../components/icon_button.slint";
+import { Utils } from "../utils.slint";
 
 component StarRating inherits HorizontalLayout {
     in property <int> rating;
@@ -15,7 +16,7 @@ component StarRating inherits HorizontalLayout {
         Rectangle {
             Image {
                 source: Icons.star;
-                colorize: i <= rating ? Palette.primary : Palette.foreground;
+                colorize: (i + 1) <= rating ? Palette.primary : Palette.foreground;
                 x: 2px;
                 y: 2px;
                 width: parent.width - self.x * 2;
@@ -25,7 +26,7 @@ component StarRating inherits HorizontalLayout {
         }
 
         clicked => {
-            star_clicked(sample_id, i);
+            star_clicked(sample_id, i + 1);
         }
     }
     IconButton {
@@ -160,7 +161,7 @@ export component SampleList inherits Rectangle {
                     }
 
                     Text {
-                        text: Math.round(sample.sample_count / sample.sample_rate * 100) / 100 + "s";
+                        text: Utils.round_to(sample.sample_count / sample.sample_rate,2) + "s";
                         width: root.duration_width;
                     }
 
