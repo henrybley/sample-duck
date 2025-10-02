@@ -98,6 +98,13 @@ impl SampleDuckApp {
             app.audio_player.toggle_play_state();
         });
 
+
+        let app_clone = app_ref.clone();
+        ui.on_stop_play(move || {
+            let mut app = app_clone.borrow_mut();
+            app.audio_player.stop();
+        });
+
         // Waveform click callback
         let app_clone = app_ref.clone();
         ui.on_waveform_clicked(move |position| {

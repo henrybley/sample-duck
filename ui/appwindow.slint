@@ -24,6 +24,7 @@ export component AppWindow inherits Window {
     callback select_sample(int);
     callback update_rating(int, int);
     callback toggle_play();
+    callback stop_play();
     callback waveform_clicked(float);
     callback next_sample();
     callback prev_sample();
@@ -71,6 +72,9 @@ export component AppWindow inherits Window {
                 toggle_play() => {
                     toggle_play();
                 };
+                stop_play() => {
+                    stop_play();
+                }
             }
 
             SampleList {
